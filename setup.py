@@ -9,55 +9,39 @@ except ImportError:
     print("No setuptools found, attempting to use distutils instead.")
     from distutils.core import setup, Extension
 
-err = []
+# These dependency checks are advisory only. The runtime requirements are
+# declared in install_requires below and installed by pip. Previously this
+# script called sys.exit(1) when pyusb was missing, which breaks installation
+# under PEP 517 build isolation (e.g. `pip install .`), where runtime deps are
+# not present in the isolated build environment. We now only print hints and
+# never abort the build.
 warn = []
-apt_get_pkgs = []
 pip_pkgs = []
 
-# Ensure we have either pyUSB 0.x or pyUSB 1.x, but we now
-#  prefer pyUSB 1.x moving forward. Support for 0.x may be deprecated.
+# pyUSB 1.x is preferred going forward.
 try:
-    import usb
+    import usb.core  # noqa: F401
 except ImportError:
-    err.append("usb")
-    apt_get_pkgs.append("python-usb")
-
-try:
-    import usb.core
-    #print("Warning: You are using pyUSB 1.x, support is in beta.")
-except ImportError:
-    warn.append("You are using pyUSB 0.x. Consider upgrading to pyUSB 1.x.")
+    warn.append("pyusb (1.x preferred) - needed at runtime to talk to USB radios")
+    pip_pkgs.append("pyusb")
 
 # TODO: Ideally we would detect missing python-dev and libgcrypt-dev to give better errors.
 
 # Dot15d4 is a dep of some of the newer tools
 try:
-    from scapy.all import Dot15d4
+    from scapy.all import Dot15d4  # noqa: F401
 except ImportError:
     warn.append("Scapy (with dot15d4 layer)")
     pip_pkgs.append("scapy")
 
-if len(err) > 0:
-    print("""
-Library requirements not met.  Install the following libraries, then re-run the setup script.
-
-{}\n""".format('\n'.join(err)), file=sys.stderr)
-
 if len(warn) > 0:
     print("""
-Library recommendations not met. For full support, install the following libraries, then re-run the setup script.
+Library recommendations not met. pip will install the runtime requirements
+listed in install_requires; the following are noted for reference:
 
 {}\n""".format('\n'.join(warn)), file=sys.stderr)
-
-if len(apt_get_pkgs) > 0 or len(pip_pkgs) > 0:
-    print("The following commands should install these dependencies on Ubuntu, and can be adapted for other OSs:", file=sys.stderr)
-    if len(apt_get_pkgs) > 0:
-        print("\tsudo apt-get install -y {}".format(' '.join(apt_get_pkgs)), file=sys.stderr)
     if len(pip_pkgs) > 0:
         print("\tpip3 install {}".format(' '.join(pip_pkgs)), file=sys.stderr)
-
-if len(err) > 0:
-    sys.exit(1)
 
 zigbee_crypt = Extension('zigbee_crypt',
                          sources = ['zigbee_crypt/zigbee_crypt.c'],
@@ -79,7 +63,7 @@ setup(name        = 'killerbee',
                  'tools/zbwardrive', 'tools/zbopenear', 'tools/zbfakebeacon',
                  'tools/zborphannotify', 'tools/zbpanidconflictflood', 'tools/zbrealign', 'tools/zbcat',
                  'tools/zbjammer', 'tools/kbbootloader'],
-      install_requires=['pyserial>=2.0', 'pyusb', 'pycrypto', 'rangeparser', 'scapy'],
+      install_requires=['pyserial>=2.0', 'pyusb', 'pycryptodome', 'rangeparser', 'scapy'],
       # NOTE: pygtk doesn't install via distutils on non-Windows hosts
       ext_modules = [zigbee_crypt],
       )
